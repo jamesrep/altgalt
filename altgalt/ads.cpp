@@ -2,11 +2,46 @@
 #include <tchar.h>
 #include <windows.h>
 #include <winbase.h>
+
 #include "ads.h"
 
 // Reference:
 // https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupread
 
+
+
+void getADS3(char *pFilename)
+{
+	HMODULE hNtdll = LoadLibrary(_T("ntdll.dll"));
+
+	NTQUERYINFORMATIONFILE NtQueryInformationFile = (NTQUERYINFORMATIONFILE)GetProcAddress(hNtdll, "NtQueryInformationFile");
+
+	BYTE btsInfoBuffer[102400];  // Just test
+	PFILE_STREAM_INFORMATION pStreamInfo = (PFILE_STREAM_INFORMATION)btsInfoBuffer;
+	IO_STATUS_BLOCK ioStatus;
+
+
+	HANDLE hFile = CreateFileA(pFilename, 0, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+	NtQueryInformationFile(hFile, &ioStatus, btsInfoBuffer, sizeof(btsInfoBuffer), 22);
+
+	if (pStreamInfo->StreamName != NULL) printf("%ls\r\n", pStreamInfo->StreamName);
+
+	ULONG currentPos = 0;
+
+	while (pStreamInfo->NextEntryOffset > 0)
+	{	
+		currentPos += pStreamInfo->NextEntryOffset;
+		pStreamInfo = (PFILE_STREAM_INFORMATION)(btsInfoBuffer + currentPos);
+
+		if (pStreamInfo->StreamName != NULL) printf("%ls\r\n", pStreamInfo->StreamName);
+	}
+
+
+
+	CloseHandle(hFile);
+
+	FreeLibrary(hNtdll);
+}
 
 
 // TODO: implement dump...
@@ -62,6 +97,7 @@ void getADS(char *pFilename)
 			{
 				DWORD dwLowByteSeeked = 0;
 				DWORD dwHighByteSeeked = 0;
+				
 				BOOL bSeek = BackupSeek(hFile, pStreamId->Size.LowPart, pStreamId->Size.HighPart, &dwLowByteSeeked, &dwHighByteSeeked, &lpContext);
 
 				if (dwLowByteSeeked <= 0 && dwHighByteSeeked <= 0)
