@@ -1,2 +1,2 @@
 # altgalt
-Just a simple tool for checking Alternate Data Streams
+Just a small tool for checking Alternate Data Streams. Not finished yet....
