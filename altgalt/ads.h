@@ -33,8 +33,17 @@ typedef NTSTATUS(NTAPI *NTQUERYINFORMATIONFILE)(
 	);
 
 
-void getADS3(char *pFilename);
-void getADS(char *pFilename);
+typedef struct tagSTREAMINFO
+{
+	WCHAR strStreamName[MAX_PATH];
+	LONGLONG streamLength;
+	LPVOID next;
+}*LPSTREAMINFO, STREAMINFO;
+
+
+void printFirstBytes(wchar_t *pFilename, DWORD byteCount);
+void getADSByNtQuery(char*pFilename);
+LPSTREAMINFO getADSInfoByFile(char *pFilename);
 
 
 

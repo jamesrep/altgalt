@@ -5,22 +5,20 @@
 
 #include "ads.h"
 
+// TODO: Well.... some better error handling could be nice.
+
 // Reference:
 // https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupread
 
 
-
-void getADS3(char *pFilename)
+// Function not used but left as an example
+void getADSByNtQuery(char *pFilename)
 {
 	HMODULE hNtdll = LoadLibrary(_T("ntdll.dll"));
-
 	NTQUERYINFORMATIONFILE NtQueryInformationFile = (NTQUERYINFORMATIONFILE)GetProcAddress(hNtdll, "NtQueryInformationFile");
-
 	BYTE btsInfoBuffer[102400];  // Just test
 	PFILE_STREAM_INFORMATION pStreamInfo = (PFILE_STREAM_INFORMATION)btsInfoBuffer;
 	IO_STATUS_BLOCK ioStatus;
-
-
 	HANDLE hFile = CreateFileA(pFilename, 0, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	NtQueryInformationFile(hFile, &ioStatus, btsInfoBuffer, sizeof(btsInfoBuffer), 22);
 
@@ -36,17 +34,46 @@ void getADS3(char *pFilename)
 		if (pStreamInfo->StreamName != NULL) printf("%ls\r\n", pStreamInfo->StreamName);
 	}
 
-
-
 	CloseHandle(hFile);
-
 	FreeLibrary(hNtdll);
 }
 
-
-// TODO: implement dump...
-void getADS(char *pFilename)
+void printFirstBytes(wchar_t *pFilename, DWORD byteCount)
 {
+	HANDLE hFile = CreateFileW(pFilename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, NULL, NULL);
+	LPBYTE lpBuffer = (LPBYTE) malloc(byteCount);
+	DWORD dwRead = 0;
+	BOOL bRead = ReadFile(hFile, lpBuffer, byteCount, &dwRead, NULL);
+
+	if (bRead)
+	{
+		for (DWORD i = 0; i < dwRead; i++)
+		{
+			if (isascii(lpBuffer[i])) printf("%c", lpBuffer[i]);			
+			else printf(".");			
+		}
+
+		printf("    ");
+
+		for (DWORD i = 0; i < dwRead; i++)
+		{
+			printf("%02x ", lpBuffer[i]);
+		}
+	}
+	else
+	{
+		printf("[-] error: could not read bytes from file: %ls \r\n", pFilename);
+	}
+
+	CloseHandle(hFile);
+}
+
+
+// Returns a linked list with ADS-info
+LPSTREAMINFO getADSInfoByFile(char *pFilename)
+{
+	LPSTREAMINFO streamInfo = NULL;
+	LPSTREAMINFO baseStream = NULL;
 	BYTE streamid[sizeof(WIN32_STREAM_ID) + sizeof(TCHAR)];
 	HANDLE hFile = CreateFileA(pFilename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
 
@@ -71,6 +98,19 @@ void getADS(char *pFilename)
 				DWORD dwSizeToAllocate = pStreamId->dwStreamNameSize + sizeof(TCHAR);
 				TCHAR* pStreamName = (TCHAR *)malloc(dwSizeToAllocate * sizeof(TCHAR));
 
+				if (streamInfo == NULL)
+				{
+					streamInfo = (LPSTREAMINFO) malloc(sizeof(STREAMINFO));
+					streamInfo->next = NULL;
+					baseStream = streamInfo;
+				}
+				else
+				{
+					streamInfo->next = (LPSTREAMINFO)malloc(sizeof(STREAMINFO));
+					streamInfo = (LPSTREAMINFO) streamInfo->next;
+					streamInfo->next = NULL;
+				}
+
 				ZeroMemory(pStreamName, dwSizeToAllocate);
 				CopyMemory(pStreamName, pStreamId->cStreamName, DW_INITIAL_COUNT);
 
@@ -85,8 +125,9 @@ void getADS(char *pFilename)
 				else
 				{
 					CopyMemory((pStreamName + 3), lpBuffer, dwBytesRead);
-					printf("%ls (%llu)\r\n", pStreamName, pStreamId->Size.QuadPart);
-
+					//printf("%ls (%llu)\r\n", pStreamName, pStreamId->Size.QuadPart);
+					lstrcpyW(streamInfo->strStreamName, pStreamName);
+					streamInfo->streamLength = pStreamId->Size.QuadPart;
 				}
 
 				free(pStreamName);
@@ -97,7 +138,6 @@ void getADS(char *pFilename)
 			{
 				DWORD dwLowByteSeeked = 0;
 				DWORD dwHighByteSeeked = 0;
-				
 				BOOL bSeek = BackupSeek(hFile, pStreamId->Size.LowPart, pStreamId->Size.HighPart, &dwLowByteSeeked, &dwHighByteSeeked, &lpContext);
 
 				if (dwLowByteSeeked <= 0 && dwHighByteSeeked <= 0)
@@ -114,9 +154,9 @@ void getADS(char *pFilename)
 		// Clean up. 
 		BackupRead(hFile, NULL, 0, &dwBytesRead, TRUE, FALSE, &lpContext);
 		CloseHandle(hFile);
-
-		
 	}
 
+	return baseStream;
 }
+
 
