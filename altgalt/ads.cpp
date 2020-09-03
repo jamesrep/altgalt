@@ -5,7 +5,7 @@
 
 #include "ads.h"
 
-// TODO: Well.... some better error handling could be nice.
+// TODO: Well.... some better error handling and buffer-reads could be nice.
 
 // Reference:
 // https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupread
@@ -16,43 +16,39 @@ LPSTREAMINFO getADSByNtQuery(char *pFilename)
 {
 	LPSTREAMINFO streamInfo = NULL;
 	LPSTREAMINFO baseStream = NULL;
-
+	const DWORD MAX_BUF = 102400;
 	HMODULE hNtdll = LoadLibrary(_T("ntdll.dll"));
 	NTQUERYINFORMATIONFILE NtQueryInformationFile = (NTQUERYINFORMATIONFILE)GetProcAddress(hNtdll, "NtQueryInformationFile");
-	BYTE btsInfoBuffer[102400];  // Just test
+	BYTE btsInfoBuffer[MAX_BUF];  // Just test, hence, dont care about buffer issues in this example.
 	PFILE_STREAM_INFORMATION pStreamInfo = (PFILE_STREAM_INFORMATION)btsInfoBuffer;
 	IO_STATUS_BLOCK ioStatus;
 	HANDLE hFile = CreateFileA(pFilename, 0, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
 	NtQueryInformationFile(hFile, &ioStatus, btsInfoBuffer, sizeof(btsInfoBuffer), 22);
-
-	if (pStreamInfo->StreamName != NULL) printf("%ls\r\n", pStreamInfo->StreamName);
-
 	ULONG currentPos = 0;
 
 	while (pStreamInfo->NextEntryOffset > 0)
 	{	
-		currentPos += pStreamInfo->NextEntryOffset;
+		currentPos += pStreamInfo->NextEntryOffset; 
+
+		if (MAX_BUF < currentPos) break; // Just test, hence, dont care about buffer issues in this example.
+
 		pStreamInfo = (PFILE_STREAM_INFORMATION)(btsInfoBuffer + currentPos);
 
 
 		if (pStreamInfo->StreamName != NULL)
 		{
-			printf("%ls\r\n", pStreamInfo->StreamName);
-
 			if (streamInfo == NULL)
 			{
 				streamInfo = (LPSTREAMINFO)malloc(sizeof(STREAMINFO));
-				baseStream = streamInfo;
-				streamInfo->next = NULL;
+				baseStream = streamInfo;				
 			}
 			else
 			{
 				streamInfo->next = (LPSTREAMINFO)malloc(sizeof(STREAMINFO));
 				streamInfo = (LPSTREAMINFO)streamInfo->next;
-				streamInfo->next = NULL;
 			}
 
-			
+			streamInfo->next = NULL;			
 			lstrcpynW(streamInfo->strStreamName, pStreamInfo->StreamName, min(pStreamInfo->StreamNameLength, MAX_PATH));
 			streamInfo->streamLength = pStreamInfo->StreamSize.QuadPart;
 		}
@@ -63,6 +59,7 @@ LPSTREAMINFO getADSByNtQuery(char *pFilename)
 
 	return baseStream;
 }
+
 
 void printFirstBytes(wchar_t *pFilename, DWORD byteCount)
 {
