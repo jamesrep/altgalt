@@ -42,8 +42,7 @@ typedef struct tagSTREAMINFO
 
 
 void printFirstBytes(wchar_t *pFilename, DWORD byteCount);
-void getADSByNtQuery(char*pFilename);
-LPSTREAMINFO getADSInfoByFile(char *pFilename);
+LPSTREAMINFO getADSByNtQuery(char*pFilename);
 
 
 
