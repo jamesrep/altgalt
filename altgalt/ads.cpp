@@ -8,7 +8,7 @@
 // TODO: Well.... some better error handling and buffer-reads could be nice.
 
 // Reference:
-// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-backupread
+// https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntqueryinformationfile
 
 
 // Function not used but left as an example
